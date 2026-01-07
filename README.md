@@ -1,354 +1,368 @@
 # SynMax Data Agent
 
-A sophisticated chat-based data analysis agent powered by LangGraph and LLMs, capable of answering natural language questions about datasets through pattern recognition, anomaly detection, and causal analysis.
+A chat-based AI agent for analyzing any CSV dataset. Built with a hierarchical agent architecture that combines intelligent query routing with rigorous statistical analysis.
+
+## Table of Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Example Queries & Outputs](#example-queries--outputs)
+- [Dataset Setup](#dataset-setup)
+- [Technical Details](#technical-details)
 
 ## Features
 
-- **Natural Language Queries**: Ask questions in plain English about your data
-- **Advanced Analytics**:
-  - Pattern recognition (clustering, correlations, trends)
-  - Anomaly detection (outliers, rule violations)
-  - Causal hypothesis generation with evidence-backed reasoning
-  - Data quality issue detection
-- **Intelligent Agent Architecture**: Built with LangGraph for robust multi-step reasoning
-- **Multiple Interfaces**:
-  - CLI for direct interaction
-  - REST API via FastAPI
-  - Simple web UI for visual interaction
-- **LLM Provider Support**: Powered by OpenAI GPT-4
+- **Natural Language Interface**: Ask questions in plain English
+- **Intelligent Query Routing**: Automatically distinguishes simple retrieval from advanced statistical analysis
+- **Rigorous Statistical Analysis**:
+  - Proper categorical variable handling (binary, nominal, ordinal)
+  - Effect size calculations with confidence intervals
+  - Correlation, regression, ANOVA, clustering, and anomaly detection
+- **Secure Code Execution**: Sandboxed Python environment using Pyodide (WebAssembly)
+- **Conversational Memory**: Maintains context across multiple questions
+- **Real-time Streaming**: See analysis progress as it happens
 
 ## Architecture
 
-The agent uses a multi-stage reasoning pipeline:
+### Overview
 
-1. **Query Understanding**: Parse natural language into analytical intent
-2. **Analysis Planning**: Determine appropriate statistical/analytical methods
-3. **Execution**: Run calculations, detect patterns, identify anomalies
-4. **Synthesis**: Generate evidence-backed answers with methodology transparency
-5. **Validation**: Check for confounders and data quality issues
+The system uses a **hierarchical ReAct (Reasoning + Acting) agent architecture** with two specialized agents:
+
+```mermaid
+flowchart TD
+    A[User Query] --> B[CLI Interface]
+    B --> C{Coordinator Agent<br/>GPT-4.1}
+
+    C -->|Intent Classification| D{Query Type?}
+
+    D -->|Simple Retrieval| E[Pyodide Sandbox Tool]
+    E --> F[Execute Python Code<br/>pandas/numpy/scipy]
+    F --> G[Return Results]
+
+    D -->|Advanced Analysis| H[Statistics Subagent]
+    H --> I[Statistical Methodology]
+    I --> J[Multiple Code Executions]
+    J --> E
+    J --> K[Effect Size Calculations]
+    K --> L[Confidence Intervals]
+    L --> M[Return Rigorous Findings]
+
+    G --> N[Result Synthesis]
+    M --> N
+    N --> O[Structured Response<br/>+ Supporting Evidence]
+    O --> P[Stream to User]
+
+    style C fill:#e1f5ff
+    style H fill:#ffe1f5
+    style E fill:#f0f0f0
+    style O fill:#e8f5e9
+```
+
+### Key Components
+
+#### 1. Coordinator Agent (`agent/root.py`)
+- **Role**: Query classification and routing
+- **Responsibilities**:
+  - Distinguish simple vs. advanced queries
+  - Handle basic data retrieval directly
+  - Delegate complex statistical tasks to specialist
+  - Synthesize results into structured responses
+
+#### 2. Statistics Subagent
+- **Role**: Expert statistician for advanced analysis
+- **Capabilities**:
+  - Pattern recognition (clustering, correlations, trends)
+  - Anomaly detection (outliers, rule violations)
+  - Causal hypothesis generation (with evidence and caveats)
+  - Proper statistical methodology enforcement
+
+#### 3. Pyodide Sandbox (`agent/tools.py`)
+- **Role**: Secure Python code execution environment
+- **Features**:
+  - Runs Python in WebAssembly (browser-like sandbox)
+  - Stateful session persistence across queries
+  - Pre-loaded dataset as pandas DataFrame
+  - No file system or network access
+  - Full pandas/numpy/scipy/scikit-learn support
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant CLI
+    participant Coordinator
+    participant Middleware
+    participant Pyodide
+    participant StatsAgent
+
+    User->>CLI: Ask Question
+    CLI->>Coordinator: HumanMessage
+
+    alt First Query Only
+        Coordinator->>Pyodide: Bootstrap Dataset
+        Pyodide->>Pyodide: Load CSV to DataFrame
+        Pyodide-->>Coordinator: Session Ready
+    end
+
+    Coordinator->>Coordinator: Classify Intent
+
+    alt Simple Retrieval
+        Coordinator->>Pyodide: Execute Code
+        Pyodide->>Pyodide: Run pandas/numpy
+        Pyodide-->>Coordinator: Results
+    else Advanced Analysis
+        Coordinator->>Middleware: Delegate to SubAgent
+        Middleware->>StatsAgent: Statistical Task
+        StatsAgent->>Pyodide: Multiple Executions
+        Pyodide-->>StatsAgent: Statistical Results
+        StatsAgent->>StatsAgent: Calculate Effect Sizes
+        StatsAgent->>StatsAgent: Generate Evidence
+        StatsAgent-->>Middleware: Rigorous Findings
+        Middleware-->>Coordinator: Synthesized Results
+    end
+
+    Coordinator->>Coordinator: Format Response
+    Coordinator-->>CLI: Stream Events
+    CLI-->>User: Display Answer + Evidence
+```
+
+### Middleware Stack
+
+The ReAct agent uses a sophisticated middleware stack for enhanced capabilities:
+
+```mermaid
+graph LR
+    A[LLM Request] --> B[TodoListMiddleware]
+    B --> C[SubAgentMiddleware]
+    C --> D[SummarizationMiddleware]
+    D --> E[PromptCachingMiddleware]
+    E --> F[PatchToolCallsMiddleware]
+    F --> G[HumanInTheLoopMiddleware]
+    G --> H[Agent Core]
+
+    H --> I[LLM Response]
+
+    style B fill:#e3f2fd
+    style C fill:#f3e5f5
+    style D fill:#fff3e0
+    style E fill:#e8f5e9
+    style F fill:#fce4ec
+    style G fill:#fff9c4
+```
+
+**Middleware Responsibilities**:
+- **TodoListMiddleware**: Tracks task progress and sub-steps
+- **SubAgentMiddleware**: Enables delegation to specialized statistics agent
+- **SummarizationMiddleware**: Auto-summarizes at 85% context (keeps last 10% of messages)
+- **PromptCachingMiddleware**: Caches system prompts for performance
+- **PatchToolCallsMiddleware**: Ensures reliable tool call execution
+- **HumanInTheLoopMiddleware**: Optional approval gates for sensitive operations
+
+### Statistical Rigor
+
+The statistics subagent enforces best practices for categorical variables:
+
+| Variable Type | Encoding | Analysis Method | Effect Size |
+|---------------|----------|-----------------|-------------|
+| Binary (2 categories) | 0/1 encoding | Point-biserial correlation | R² = correlation² |
+| Nominal (unordered) | One-hot encoding | ANOVA | R² = eta-squared |
+| Ordinal (ordered) | Label encoding | Spearman correlation | R² = rho² |
+
+**Key Safeguards**:
+- Prevents treating nominal variables as ordinal (false ordering)
+- Requires assumption validation (normality, homoscedasticity)
+- Uses non-parametric alternatives when assumptions violated
+- Reports confidence intervals and practical significance
+- Hedges causal claims with evidence and limitations
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.10 or higher
-- pip or poetry
-- OpenAI API key
+- **Python**: 3.10 or higher
+- **Deno**: JavaScript/TypeScript runtime (required for Pyodide sandbox)
+- **API Keys**: OpenAI API key (GPT-4 access required)
 
-### Setup
+### Step 1: Install Deno
 
-1. Clone the repository:
+Deno is a secure JavaScript/TypeScript runtime that powers the Pyodide sandbox environment. It provides:
+- WebAssembly support for running Python in isolation
+- Secure sandboxing with no file/network access by default
+- Fast startup and execution times
+
+Install Deno using the official installer:
+
 ```bash
-git clone <your-repo-url>
+curl -fsSL https://deno.land/install.sh | sh
+```
+
+After installation, add Deno to your PATH (the installer will provide specific instructions for your shell).
+
+Verify installation:
+```bash
+deno --version
+```
+
+### Step 2: Clone Repository
+
+```bash
+git clone https://github.com/yourusername/synmax-agent.git
 cd synmax-agent
 ```
 
-2. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+### Step 3: Install Python Dependencies
 
-3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Set up environment variables:
+### Step 4: Configure Environment Variables
+
+Copy the example environment file:
+
 ```bash
-export OPENAI_API_KEY="your-openai-key"
+cp .env.example .env
 ```
 
-Or create a `.env` file:
+Edit `.env` and add your OpenAI API key and dataset path:
+
+```bash
+OPENAI_API_KEY=sk-your-key-here
+DATASET_PATH=./data/dataset.csv
 ```
-OPENAI_API_KEY=your-openai-key
+
+### Step 5: Setup Dataset
+
+See [Dataset Setup](#dataset-setup) section below.
+
+## Quick Start
+
+### Interactive Mode (Recommended)
+
+Start a conversational session:
+
+```bash
+python cli.py
 ```
+
+You'll see:
+```
+Data Agent initialized successfully.
+Dataset: data/medical.csv (1338 rows, 7 columns)
+
+Ask a question (or type 'quit' to exit):
+>
+```
+
+Ask questions naturally:
+```
+> How many smokers are in the dataset?
+> What is the correlation between BMI and charges?
+> Are there any unusual patterns in charges by region?
+```
+
+Exit with `quit` or `exit`.
+
+### Single Query Mode
+
+Run one-off queries:
+
+```bash
+python cli.py --query "What is the average age of smokers vs non-smokers?"
+```
+
+The agent will:
+1. Create a plan
+2. Execute the analysis
+3. Return the answer
+4. Exit
+
+## Example Queries & Outputs
+TODO
 
 ## Dataset Setup
 
-The agent requires the dataset to be available locally. **Do not commit the dataset to the repository.**
+The dataset is NOT included in this repository per assignment requirements. 
 
-### Option 1: Manual Download (Recommended)
+1. Place the `dataset.csv` in the `data/` directory:
+2. The agent will automatically detect it on startup
+3. Update .env DATASET_PATH=data/dataset.csv
 
-1. Download the dataset from [this link](https://drive.google.com/file/d/109vhmnSLN3oofjFdyb58l_rUZRa0d6C8/view?usp=drivesdk)
-2. Place it in the `./data/` directory (this folder is gitignored)
-3. The agent will automatically detect and load the dataset
 
-### Option 2: Automatic Download
+#### 8. Security
+- **Sandboxed execution**: Pyodide has no file system or network access
+- **API keys**: Stored in `.env` (ensure not committed to version control)
+- **Code injection**: LLM-generated code could theoretically contain malicious logic
+  (mitigated by sandbox and code review prompts)
 
-Run the setup script:
-```bash
-python scripts/download_dataset.py
+### Known Issues
+
+1. **Very long numerical outputs** may be truncated by the Pyodide sandbox
+2. **Matplotlib plots** cannot be displayed in CLI (text-only interface)
+3. **Large dataset operations** (e.g., 10,000+ row permutation tests) may timeout
+4. **Conversation context** exceeding 100K tokens triggers auto-summarization (may lose nuance)
+
+## Technical Details
+
+### Model Configuration
+
+- **Primary LLM**: OpenAI GPT-4.1 (model: `gpt-4.1`, temperature: 0.1)
+- **Rationale**: Low temperature ensures deterministic, accurate responses for data analysis
+- **Token limits**: ~128K input context, 4K output tokens
+
+### Dependencies
+
+Key libraries (143 total packages):
+
+```
+langgraph==1.0.5           # Agent orchestration
+langchain==1.2.0           # LLM abstractions
+langchain-openai==1.1.6    # OpenAI integration
+deepagents==0.3.1          # ReAct agent framework
+langchain-sandbox==0.0.6   # Pyodide sandboxing
+pandas==2.3.3              # Data manipulation
+numpy==2.4.0               # Numerical computing
+scikit-learn==1.6.1        # Machine learning
+scipy==1.15.1              # Statistical functions
 ```
 
-This will download the dataset to `./data/` automatically.
+See `requirements.txt` for complete list.
 
-### Option 3: Custom Path
+### Observability (Optional)
 
-You can specify a custom path when running the agent:
-```bash
-python -m agent.cli --dataset-path /path/to/your/dataset.csv
-```
+The agent supports optional Langfuse integration for monitoring:
+- Traces all LLM calls and tool executions
+- Measures query latency (speed = 30% of evaluation score)
+- Provides debugging insights for complex workflows
 
-## Usage
+To enable:
+1. Sign up at https://cloud.langfuse.com
+2. Add environment variables to `.env`:
+   ```bash
+   LANGFUSE_PUBLIC_KEY=pk-lf-...
+   LANGFUSE_SECRET_KEY=sk-lf-...
+   LANGFUSE_HOST=https://cloud.langfuse.com
+   ```
 
-### CLI Mode
-
-Basic usage:
-```bash
-python -m agent.cli
-```
-
-With custom dataset path:
-```bash
-python -m agent.cli --dataset-path /custom/path/data.csv
-```
-
-Interactive session:
-```
-> What is the total count of records in 2024?
-> Show me the top 5 patterns in customer behavior
-> Are there any anomalies in the sales data?
-> What might explain the correlation between X and Y?
-```
-
-### API Mode
-
-Start the FastAPI server:
-```bash
-uvicorn agent.api:app --reload --host 0.0.0.0 --port 8000
-```
-
-The API will be available at `http://localhost:8000`
-
-API Documentation: `http://localhost:8000/docs`
-
-Example API request:
-```bash
-curl -X POST "http://localhost:8000/query" \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What are the top 5 anomalies in the dataset?"}'
-```
-
-### Web UI
-
-1. Start the API server (see above)
-2. Open `index.html` in your browser
-3. Start asking questions through the visual interface
-
-Or serve via Python:
-```bash
-python -m http.server 8080
-```
-Then navigate to `http://localhost:8080`
-
-## Example Queries & Outputs
-
-### Simple Retrieval
-**Query**: "How many records are there from 2024?"
-
-**Output**:
-```
-Answer: There are 1,247 records from 2024.
-
-Method: Direct filtering and count aggregation
-Columns Used: date_column
-Filters Applied: year == 2024
-```
-
-### Pattern Recognition
-**Query**: "What patterns exist in customer purchasing behavior?"
-
-**Output**:
-```
-Answer: Identified 3 distinct customer segments using K-means clustering:
-
-1. High-Value Infrequent (23% of customers)
-   - Average order value: $450
-   - Purchase frequency: 2.1x per year
-   - Peak activity: Q4
-
-2. Regular Moderate (58% of customers)
-   - Average order value: $120
-   - Purchase frequency: 8.3x per year
-   - Consistent throughout year
-
-3. Frequent Low-Value (19% of customers)
-   - Average order value: $35
-   - Purchase frequency: 24.7x per year
-   - Peak activity: Weekends
-
-Method: K-means clustering (k=3, silhouette score: 0.67)
-Features: purchase_frequency, avg_order_value, seasonality_index
-Statistical Significance: p < 0.001
-```
-
-### Anomaly Detection
-**Query**: "Find anomalies in the sales data"
-
-**Output**:
-```
-Answer: Detected 12 significant anomalies using Isolation Forest:
-
-Top 3 Anomalies:
-1. Record #4521 (2024-03-15): Sales spike 847% above normal
-   - Potential Cause: Marketing campaign + viral social media
-
-2. Record #8934 (2024-07-22): Zero sales during peak hour
-   - Potential Data Quality Issue: System downtime not recorded
-
-3. Record #2103 (2024-01-08): Negative inventory count
-   - Data Quality Issue: Database constraint violation
-
-Method: Isolation Forest (contamination=0.01)
-Anomaly Score Threshold: > 0.6
-Features Analyzed: sales_volume, transaction_count, inventory_level
-```
-
-### Causal Analysis
-**Query**: "Why is there a correlation between X and Y?"
-
-**Output**:
-```
-Answer: Observed strong positive correlation (r=0.78, p<0.001) between marketing_spend and revenue.
-
-Plausible Causal Hypotheses:
-
-1. Direct Effect (Most Likely):
-   - Increased marketing → more customer awareness → higher sales
-   - Evidence: 2-week lag between spend and revenue peaks
-   - Supports: Granger causality test significant (p=0.003)
-
-2. Confounding Variable (Moderate Likelihood):
-   - Seasonality drives both marketing budget and natural demand
-   - Evidence: Both peak in Q4
-   - Caveat: Partial correlation controlling for month still significant (r=0.64)
-
-3. Reverse Causation (Lower Likelihood):
-   - Higher revenue → larger marketing budgets
-   - Evidence: Some budget decisions follow revenue reports
-   - Limitation: Time-lagged analysis shows spend precedes revenue
-
-Robustness Checks Performed:
-- Partial correlation controlling for seasonality
-- Granger causality test
-- Time-lagged correlation analysis
-- Outlier sensitivity analysis
-
-Limitations:
-- Observational data; cannot prove causation
-- Other unmeasured confounders may exist
-- Marketing channel effectiveness not differentiated
-```
-
-## Assumptions & Limitations
-
-### Assumptions
-- Dataset is in CSV format (or can be automatically inferred)
-- Dates are parseable (will attempt multiple common formats)
-- Missing values are either NULL, empty strings, or "NaN"
-- Numerical columns use standard decimal notation
-
-### Limitations
-- **LLM Costs**: Complex queries may require multiple LLM calls
-- **Dataset Size**: Extremely large datasets (>1GB) may require sampling for some analyses
-- **Statistical Validity**: Causal claims are hypotheses, not definitive conclusions
-- **Context Window**: Very wide datasets (>100 columns) may require column selection
-- **Real-time Data**: Agent analyzes static snapshots, not streaming data
-
-### Design Decisions
-- **Conservative Causation**: Agent explicitly labels causal claims as hypotheses with caveats
-- **Methodology Transparency**: All methods and parameters are included in responses
-- **Data Quality First**: Proactively flags potential data quality issues
-- **Reproducibility**: Analysis steps are deterministic where possible
-
-## Technical Stack
-
-- **Agent Framework**: LangGraph for stateful multi-step reasoning
-- **LLM Provider**: OpenAI GPT-4
-- **API Framework**: FastAPI for REST endpoints
-- **Data Processing**: pandas, numpy, scikit-learn
-- **Statistical Analysis**: scipy, statsmodels
-- **Visualization**: matplotlib, seaborn (for analysis, not UI)
-
-## Project Structure
+### Project Structure
 
 ```
 synmax-agent/
 ├── agent/
-│   ├── __init__.py
-│   ├── cli.py              # CLI interface
-│   ├── api.py              # FastAPI server
-│   ├── graph.py            # LangGraph agent definition
-│   ├── nodes/              # Agent processing nodes
-│   ├── tools/              # Data analysis tools
-│   └── utils/              # Helper functions
-├── data/                   # Dataset directory (gitignored)
-├── scripts/
-│   └── download_dataset.py # Dataset download utility
-├── tests/                  # Unit and integration tests
-├── index.html              # Simple web UI
-├── requirements.txt        # Python dependencies
-├── .env.example            # Environment variable template
-├── .gitignore
-└── README.md
+│   ├── root.py              # Main DataAgent orchestrator
+│   ├── react_agent.py       # ReAct agent with middleware stack
+│   ├── prompts.py           # System prompts (coordinator + stats agent)
+│   └── tools.py             # Pyodide sandbox tool
+├── cli.py                   # Command-line interface
+├── data/                    # Dataset storage (gitignored)
+│   ├── medical.csv          # Insurance dataset (not in repo)
+│   └── SAMPLE_QUERIES.txt   # Example questions
+├── requirements.txt         # Python dependencies
+├── .env.example            # Environment template
+├── .gitignore              # Excludes data/ and .env
+└── README.md               # This file
 ```
 
-## Development
-
-### Running Tests
-```bash
-pytest tests/
-```
-
-### Code Quality
-```bash
-# Type checking
-mypy agent/
-
-# Linting
-ruff check agent/
-
-# Formatting
-black agent/
-```
-
-## Performance Considerations
-
-- **Query Optimization**: Agent caches dataset schema and statistics
-- **Parallel Processing**: Multiple analyses run concurrently where possible
-- **Intelligent Sampling**: Large datasets are sampled for exploratory analysis
-- **Result Caching**: Repeated queries use cached results when appropriate
-
-## Troubleshooting
-
-### Common Issues
-
-**"Dataset not found"**
-- Ensure dataset is in `./data/` directory
-- Check file permissions
-- Verify file is not corrupted
-
-**"API key not configured"**
-- Set environment variable: `OPENAI_API_KEY`
-- Check `.env` file is in project root
-- Verify key is valid and has sufficient credits
-
-**"Out of memory errors"**
-- Try with a smaller dataset sample
-- Increase system memory allocation
-- Use `--sample-size` flag to limit rows processed
-
-## Contributing
-
-This is a take-home assignment project. Contributions are not currently being accepted.
-
-## License
-
-This project is created as part of a job application for SynMax.
-
-## Contact
-
-[Your Name]
-[Your Email]
-[Your GitHub Profile]

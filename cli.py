@@ -23,7 +23,8 @@ async def run_single_query(agent: DataAgent, query: str):
         # Show tool calls when AI decides to call a tool
         if "tool_calls" in event:
             for tool_call in event["tool_calls"]:
-                print(f"→ calling {tool_call['name']}")
+                tool_name = "specialized sub-agent" if tool_call['name'] == 'task' else tool_call['name']
+                print(f"→ calling {tool_name}")
 
         # Capture final answer (last AIMessage that doesn't have tool calls)
         elif "AIMessage" in event_type and "tool_calls" not in event:
@@ -70,7 +71,8 @@ async def run_interactive(agent: DataAgent):
                 # Show tool calls when AI decides to call a tool
                 if "tool_calls" in event:
                     for tool_call in event["tool_calls"]:
-                        print(f"→ calling {tool_call['name']}")
+                        tool_name = "specialized sub-agent" if tool_call['name'] == 'task' else tool_call['name']
+                        print(f"→ calling {tool_name}")
 
                 # Capture final answer (last AIMessage that doesn't have tool calls)
                 elif "AIMessage" in event_type and "tool_calls" not in event:

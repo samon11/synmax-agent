@@ -1,16 +1,20 @@
 import os
-from typing import Generator, Dict, Any
-from deepagents import create_deep_agent
+from typing import Dict, Any
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 
+from agent.react_agent import create_react_agent
 from agent.tools import PyodideDatasetTool, get_dataset_schema_and_sample
-from agent.prompts import DATA_SCIENCE_AGENT_SYSTEM_PROMPT, STATISTICS_SUBAGENT_SYSTEM_PROMPT
+from agent.prompts import (
+    DATA_SCIENCE_AGENT_SYSTEM_PROMPT,
+    STATISTICS_SUBAGENT_SYSTEM_PROMPT,
+)
 
 # Try to import Langfuse (optional dependency)
 try:
     from langfuse.langchain import CallbackHandler
+
     LANGFUSE_AVAILABLE = True
 except ImportError:
     LANGFUSE_AVAILABLE = False
@@ -19,7 +23,7 @@ except ImportError:
 
 class DataAgent:
     """
-    Deep agent for data analysis with streaming and batch query capabilities.
+    Plan and Execute agent for data analysis with streaming capabilities.
 
     Architecture:
     - Main coordinator agent: Routes queries and handles simple retrieval
@@ -37,7 +41,7 @@ class DataAgent:
         dataset_path: str = None,
         model: str = "gpt-4",
         temperature: float = 0.1,
-        enable_langfuse: bool = True
+        enable_langfuse: bool = True,
     ):
         """
         Initialize the DataAgent.
@@ -48,7 +52,9 @@ class DataAgent:
             temperature: Temperature for LLM responses (default: 0.1 for consistency)
             enable_langfuse: Enable Langfuse logging (default: True, requires env vars)
         """
-        self.dataset_path = dataset_path or os.environ.get("DATASET_PATH", "./dataset.csv")
+        self.dataset_path = dataset_path or os.environ.get(
+            "DATASET_PATH", "./dataset.csv"
+        )
         self.api_key = os.environ.get("OPENAI_API_KEY")
         self.model = model
 
@@ -75,9 +81,7 @@ class DataAgent:
 
         # Initialize LLM
         self.llm = ChatOpenAI(
-            model=model,
-            temperature=temperature,
-            api_key=self.api_key
+            model=model, temperature=temperature, api_key=self.api_key
         )
 
         # Create code interpreter tool with dataset access
@@ -109,12 +113,12 @@ class DataAgent:
         }
 
         # Create the deep agent with system prompt, tools, and subagents
-        self.agent = create_deep_agent(
+        self.agent = create_react_agent(
             model=self.llm,
             tools=[self.code_interpreter],
             system_prompt=system_prompt,
             checkpointer=self.memory,
-            subagents=[statistics_subagent]
+            subagents=[statistics_subagent],
         )
 
     async def astream(self, question: str, thread_id: str = "default"):
@@ -145,23 +149,25 @@ class DataAgent:
             config["callbacks"] = [self.langfuse_handler]
 
         # Create input message
-        input_message = {
-            "messages": [HumanMessage(content=question)]
-        }
+        input_message = {"messages": [HumanMessage(content=question)]}
 
         # Stream events from the agent
-        async for event in self.agent.astream(input_message, config, stream_mode="values"):
+        async for event in self.agent.astream(
+            input_message, config, stream_mode="values"
+        ):
             # Extract the last message from the event
             if "messages" in event and len(event["messages"]) > 0:
                 last_message = event["messages"][-1]
 
                 event_data = {
                     "type": last_message.__class__.__name__,
-                    "content": last_message.content if hasattr(last_message, "content") else str(last_message),
+                    "content": last_message.content
+                    if hasattr(last_message, "content")
+                    else str(last_message),
                     "metadata": {
                         "thread_id": thread_id,
-                        "message_count": len(event["messages"])
-                    }
+                        "message_count": len(event["messages"]),
+                    },
                 }
 
                 # Add tool call information if present
@@ -176,28 +182,6 @@ class DataAgent:
                     event_data["tool_name"] = last_message.name
 
                 yield event_data
-
-    def stream(self, question: str, thread_id: str = "default") -> Generator[Dict[str, Any], None, None]:
-        """
-        Synchronous stream method (deprecated, use astream instead).
-
-        This method is provided for backward compatibility but should be avoided.
-        Use astream() for proper async support.
-        """
-        import asyncio
-        # Run the async generator in a sync context
-        loop = asyncio.get_event_loop()
-        async_gen = self.astream(question, thread_id)
-
-        try:
-            while True:
-                try:
-                    event = loop.run_until_complete(async_gen.__anext__())
-                    yield event
-                except StopAsyncIteration:
-                    break
-        finally:
-            loop.run_until_complete(async_gen.aclose())
 
     async def aquery(self, question: str, thread_id: str = "default") -> Dict[str, Any]:
         """
@@ -228,9 +212,7 @@ class DataAgent:
             config["callbacks"] = [self.langfuse_handler]
 
         # Create input message
-        input_message = {
-            "messages": [HumanMessage(content=question)]
-        }
+        input_message = {"messages": [HumanMessage(content=question)]}
 
         # Invoke the agent and get final state
         final_state = await self.agent.ainvoke(input_message, config)
@@ -247,24 +229,13 @@ class DataAgent:
             "conversation": [
                 {
                     "role": msg.__class__.__name__,
-                    "content": msg.content if hasattr(msg, "content") else str(msg)
+                    "content": msg.content if hasattr(msg, "content") else str(msg),
                 }
                 for msg in messages
             ],
             "metadata": {
                 "thread_id": thread_id,
                 "message_count": len(messages),
-                "dataset_path": self.dataset_path
-            }
+                "dataset_path": self.dataset_path,
+            },
         }
-
-    def query(self, question: str, thread_id: str = "default") -> Dict[str, Any]:
-        """
-        Synchronous query method (deprecated, use aquery instead).
-
-        This method is provided for backward compatibility but should be avoided.
-        Use aquery() for proper async support.
-        """
-        import asyncio
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.aquery(question, thread_id))

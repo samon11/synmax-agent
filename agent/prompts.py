@@ -289,6 +289,37 @@ Your workflow MUST follow these steps:
    ❌ BAD Example (too verbose):
    "Being a smoker increases insurance charges by an average of $23,616 compared to non-smokers (95% confidence interval: $21,953 to $25,279). This difference is highly statistically significant (p < 0.0001) and represents a very large effect size (Cohen's d = 2.05). Smoking status alone explains about 62% of the variance in insurance charges, indicating a strong and substantial impact."
 
+   📊 SUMMARY TABLE REQUIREMENT:
+
+   For complex analyses (especially when delegating to stats-agent), include a summary table showing the workflow steps:
+
+   **Summary Table of Workflow Steps:**
+
+   | Step | Action |
+   |------|--------|
+   | 1    | [First step of the analysis] |
+   | 2    | [Second step] |
+   | 3    | [Third step] |
+   | ...  | ... |
+
+   Example:
+   | Step | Action |
+   |------|--------|
+   | 1    | Define cost-effectiveness metric |
+   | 2    | Data quality check and preparation |
+   | 3    | Build multiple linear regression model |
+   | 4    | Group data into demographic segments |
+   | 5    | Calculate actual vs. predicted charges for each segment |
+   | 6    | Rank segments by cost-effectiveness |
+   | 7    | Interpret model coefficients and segment results |
+   | 8    | Note data quality, limitations, and synthesize findings |
+
+   - Include this table BEFORE the "Supporting Evidence" section
+   - Use clear, action-oriented descriptions (verb-first)
+   - Keep each step description concise (5-10 words)
+   - Number steps sequentially to show the logical flow
+   - Typically 4-8 steps for most analyses
+
 5. BONUS OPPORTUNITIES (EXTRA CREDIT):
 
    Actively look for and highlight these insights when relevant:
@@ -327,41 +358,3 @@ IMPORTANT GUIDELINES:
 - Be efficient - speed counts for 30% of evaluation
 - Format final output according to the structure above (concise + evidence)
 - Proactively look for bonus opportunities to provide extra value"""
-
-UNDERSTAND_QUERY_PROMPT = """Analyze this data analysis question and classify its intent:
-Question: {question}
-
-Classify as one of:
-- SIMPLE_RETRIEVAL: Count, sum, filter operations
-- PATTERN_RECOGNITION: Clustering, correlations, trends
-- ANOMALY_DETECTION: Outliers, violations, unusual patterns
-- CAUSAL_ANALYSIS: Why questions, relationship explanations
-
-Provide a brief analysis of what the user is asking for."""
-
-PLAN_ANALYSIS_PROMPT = """Create an analysis plan for this question:
-Question: {question}
-
-Specify:
-1. Data loading steps
-2. Required transformations
-3. Statistical methods to use
-4. Validation checks
-5. Output format
-
-Keep it concise and actionable."""
-
-SYNTHESIZE_ANSWER_PROMPT = """Synthesize a clear, evidence-backed answer.
-
-Question: {question}
-Analysis Plan: {plan}
-Results: {results}
-
-Provide:
-1. Direct answer to the question
-2. Supporting evidence
-3. Methods used
-4. Any limitations or caveats
-
-Format clearly for user consumption."""
-
