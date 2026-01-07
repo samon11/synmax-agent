@@ -1,0 +1,270 @@
+import os
+from typing import Generator, Dict, Any
+from deepagents import create_deep_agent
+from langgraph.checkpoint.memory import InMemorySaver
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage
+
+from agent.tools import PyodideDatasetTool, get_dataset_schema_and_sample
+from agent.prompts import DATA_SCIENCE_AGENT_SYSTEM_PROMPT, STATISTICS_SUBAGENT_SYSTEM_PROMPT
+
+# Try to import Langfuse (optional dependency)
+try:
+    from langfuse.langchain import CallbackHandler
+    LANGFUSE_AVAILABLE = True
+except ImportError:
+    LANGFUSE_AVAILABLE = False
+    CallbackHandler = None
+
+
+class DataAgent:
+    """
+    Deep agent for data analysis with streaming and batch query capabilities.
+
+    Architecture:
+    - Main coordinator agent: Routes queries and handles simple retrieval
+    - Statistics subagent: Handles advanced statistical analysis with proper methodology
+
+    The coordinator delegates complex tasks (correlations, patterns, forecasting, etc.)
+    to the specialized statistics subagent which has rigorous training in:
+    - Proper categorical variable encoding (binary vs nominal vs ordinal)
+    - Appropriate statistical tests for different variable type combinations
+    - Effect size reporting and confidence intervals
+    """
+
+    def __init__(
+        self,
+        dataset_path: str = None,
+        model: str = "gpt-4",
+        temperature: float = 0.1,
+        enable_langfuse: bool = True
+    ):
+        """
+        Initialize the DataAgent.
+
+        Args:
+            dataset_path: Path to the dataset file. Falls back to DATASET_PATH env var.
+            model: OpenAI model to use (default: gpt-4)
+            temperature: Temperature for LLM responses (default: 0.1 for consistency)
+            enable_langfuse: Enable Langfuse logging (default: True, requires env vars)
+        """
+        self.dataset_path = dataset_path or os.environ.get("DATASET_PATH", "./dataset.csv")
+        self.api_key = os.environ.get("OPENAI_API_KEY")
+        self.model = model
+
+        if not self.api_key:
+            raise ValueError("OPENAI_API_KEY environment variable must be set")
+
+        # Initialize Langfuse callback handler (optional)
+        self.langfuse_handler = None
+        if enable_langfuse and LANGFUSE_AVAILABLE:
+            try:
+                # Check if Langfuse env vars are set
+                public_key = os.environ.get("LANGFUSE_PUBLIC_KEY")
+                secret_key = os.environ.get("LANGFUSE_SECRET_KEY")
+
+                if public_key and secret_key:
+                    self.langfuse_handler = CallbackHandler()
+                    print("✓ Langfuse logging enabled")
+                else:
+                    print("⚠ Langfuse env vars not set, logging disabled")
+            except Exception as e:
+                print(f"⚠ Failed to initialize Langfuse: {e}")
+        elif enable_langfuse and not LANGFUSE_AVAILABLE:
+            print("⚠ Langfuse not installed. Install with: pip install langfuse")
+
+        # Initialize LLM
+        self.llm = ChatOpenAI(
+            model=model,
+            temperature=temperature,
+            api_key=self.api_key
+        )
+
+        # Create code interpreter tool with dataset access
+        # Bootstrap happens lazily on first use
+        self.code_interpreter = PyodideDatasetTool(dataset_path=self.dataset_path)
+
+        # Load dataset schema and sample rows
+        self.dataset_context = get_dataset_schema_and_sample(self.dataset_path)
+
+        # Create memory saver for conversation history
+        self.memory = InMemorySaver()
+
+        # Format system prompt with dataset context
+        system_prompt = DATA_SCIENCE_AGENT_SYSTEM_PROMPT.format(
+            dataset_context=self.dataset_context
+        )
+
+        # Format statistics subagent prompt with dataset context
+        stats_system_prompt = STATISTICS_SUBAGENT_SYSTEM_PROMPT.format(
+            dataset_context=self.dataset_context
+        )
+
+        # Create statistics subagent configuration
+        statistics_subagent = {
+            "name": "stats-agent",
+            "description": "Expert statistician for advanced analysis including correlations, patterns, anomalies, forecasting, and statistical tests. Handles all categorical variable encoding properly.",
+            "system_prompt": stats_system_prompt,
+            "tools": [self.code_interpreter],
+        }
+
+        # Create the deep agent with system prompt, tools, and subagents
+        self.agent = create_deep_agent(
+            model=self.llm,
+            tools=[self.code_interpreter],
+            system_prompt=system_prompt,
+            checkpointer=self.memory,
+            subagents=[statistics_subagent]
+        )
+
+    async def astream(self, question: str, thread_id: str = "default"):
+        """
+        Stream agent events in real-time as the agent processes the query (async).
+
+        Args:
+            question: The user's natural language question
+            thread_id: Thread ID for conversation continuity (default: "default")
+
+        Yields:
+            Dict containing event information with keys:
+                - type: Event type (e.g., "message", "tool_call", "thinking")
+                - content: Event content
+                - metadata: Additional event metadata
+
+        Example:
+            >>> agent = DataAgent(dataset_path="data.csv")
+            >>> async for event in agent.astream("How many records are there?"):
+            >>>     print(f"{event['type']}: {event['content']}")
+        """
+        # Bootstrap dataset on first use (idempotent)
+        await self.code_interpreter.bootstrap()
+
+        # Build config with thread_id and optional Langfuse callback
+        config = {"configurable": {"thread_id": thread_id}}
+        if self.langfuse_handler:
+            config["callbacks"] = [self.langfuse_handler]
+
+        # Create input message
+        input_message = {
+            "messages": [HumanMessage(content=question)]
+        }
+
+        # Stream events from the agent
+        async for event in self.agent.astream(input_message, config, stream_mode="values"):
+            # Extract the last message from the event
+            if "messages" in event and len(event["messages"]) > 0:
+                last_message = event["messages"][-1]
+
+                event_data = {
+                    "type": last_message.__class__.__name__,
+                    "content": last_message.content if hasattr(last_message, "content") else str(last_message),
+                    "metadata": {
+                        "thread_id": thread_id,
+                        "message_count": len(event["messages"])
+                    }
+                }
+
+                # Add tool call information if present
+                if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+                    event_data["tool_calls"] = [
+                        {"name": tc.get("name", "unknown"), "id": tc.get("id", "")}
+                        for tc in last_message.tool_calls
+                    ]
+
+                # Add tool name if this is a tool message
+                if hasattr(last_message, "name"):
+                    event_data["tool_name"] = last_message.name
+
+                yield event_data
+
+    def stream(self, question: str, thread_id: str = "default") -> Generator[Dict[str, Any], None, None]:
+        """
+        Synchronous stream method (deprecated, use astream instead).
+
+        This method is provided for backward compatibility but should be avoided.
+        Use astream() for proper async support.
+        """
+        import asyncio
+        # Run the async generator in a sync context
+        loop = asyncio.get_event_loop()
+        async_gen = self.astream(question, thread_id)
+
+        try:
+            while True:
+                try:
+                    event = loop.run_until_complete(async_gen.__anext__())
+                    yield event
+                except StopAsyncIteration:
+                    break
+        finally:
+            loop.run_until_complete(async_gen.aclose())
+
+    async def aquery(self, question: str, thread_id: str = "default") -> Dict[str, Any]:
+        """
+        Execute a complete query and return the final results (async, non-streaming).
+
+        Args:
+            question: The user's natural language question
+            thread_id: Thread ID for conversation continuity (default: "default")
+
+        Returns:
+            Dict containing:
+                - question: The original question
+                - answer: The final synthesized answer
+                - conversation: Full conversation history
+                - metadata: Additional information about the query
+
+        Example:
+            >>> agent = DataAgent(dataset_path="data.csv")
+            >>> result = await agent.aquery("What's the average revenue by category?")
+            >>> print(result["answer"])
+        """
+        # Bootstrap dataset on first use (idempotent)
+        await self.code_interpreter.bootstrap()
+
+        # Build config with thread_id and optional Langfuse callback
+        config = {"configurable": {"thread_id": thread_id}}
+        if self.langfuse_handler:
+            config["callbacks"] = [self.langfuse_handler]
+
+        # Create input message
+        input_message = {
+            "messages": [HumanMessage(content=question)]
+        }
+
+        # Invoke the agent and get final state
+        final_state = await self.agent.ainvoke(input_message, config)
+
+        # Extract messages from final state
+        messages = final_state.get("messages", [])
+
+        # Get the last AI message as the answer
+        answer = messages[-1].content
+
+        return {
+            "question": question,
+            "answer": answer,
+            "conversation": [
+                {
+                    "role": msg.__class__.__name__,
+                    "content": msg.content if hasattr(msg, "content") else str(msg)
+                }
+                for msg in messages
+            ],
+            "metadata": {
+                "thread_id": thread_id,
+                "message_count": len(messages),
+                "dataset_path": self.dataset_path
+            }
+        }
+
+    def query(self, question: str, thread_id: str = "default") -> Dict[str, Any]:
+        """
+        Synchronous query method (deprecated, use aquery instead).
+
+        This method is provided for backward compatibility but should be avoided.
+        Use aquery() for proper async support.
+        """
+        import asyncio
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self.aquery(question, thread_id))
