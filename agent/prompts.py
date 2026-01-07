@@ -293,7 +293,7 @@ Your workflow MUST follow these steps:
 
    For complex analyses (especially when delegating to stats-agent), include a summary table showing the workflow steps:
 
-   **Summary Table of Workflow Steps:**
+   **Summary of Steps Taken:**
 
    | Step | Action |
    |------|--------|

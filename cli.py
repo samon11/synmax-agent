@@ -32,7 +32,7 @@ async def run_single_query(agent: DataAgent, query: str):
                     print(f"  ↳ [{subagent_name}] calling {tool_name}")
                 else:
                     if tool_name == 'task':
-                        print("→ calling specialized sub-agent")
+                        print("→ calling stats sub-agent")
                     else:
                         print(f"→ calling {tool_name}")
 
@@ -90,7 +90,7 @@ async def run_interactive(agent: DataAgent):
                             print(f"  ↳ [{subagent_name}] calling {tool_name}")
                         else:
                             if tool_name == 'task':
-                                print(f"→ calling specialized sub-agent")
+                                print("→ calling stats sub-agent")
                             else:
                                 print(f"→ calling {tool_name}")
 
