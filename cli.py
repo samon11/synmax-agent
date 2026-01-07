@@ -19,15 +19,25 @@ async def run_single_query(agent: DataAgent, query: str):
     async for event in agent.astream(query):
         event_type = event.get("type", "")
         content = event.get("content", "")
+        metadata = event.get("metadata", {})
+        is_subagent = metadata.get("is_subagent", False)
+        subagent_name = metadata.get("subagent_name")
 
         # Show tool calls when AI decides to call a tool
         if "tool_calls" in event:
             for tool_call in event["tool_calls"]:
-                tool_name = "specialized sub-agent" if tool_call['name'] == 'task' else tool_call['name']
-                print(f"→ calling {tool_name}")
+                tool_name = tool_call['name']
+                if is_subagent:
+                    # Indent subagent tool calls to show hierarchy
+                    print(f"  ↳ [{subagent_name}] calling {tool_name}")
+                else:
+                    if tool_name == 'task':
+                        print("→ calling specialized sub-agent")
+                    else:
+                        print(f"→ calling {tool_name}")
 
-        # Capture final answer (last AIMessage that doesn't have tool calls)
-        elif "AIMessage" in event_type and "tool_calls" not in event:
+        # Capture final answer (last AIMessage from main agent without tool calls)
+        elif "AIMessage" in event_type and "tool_calls" not in event and not is_subagent:
             final_answer = content
 
     # Display final answer
@@ -67,15 +77,25 @@ async def run_interactive(agent: DataAgent):
             async for event in agent.astream(question):
                 event_type = event.get("type", "")
                 content = event.get("content", "")
+                metadata = event.get("metadata", {})
+                is_subagent = metadata.get("is_subagent", False)
+                subagent_name = metadata.get("subagent_name")
 
                 # Show tool calls when AI decides to call a tool
                 if "tool_calls" in event:
                     for tool_call in event["tool_calls"]:
-                        tool_name = "specialized sub-agent" if tool_call['name'] == 'task' else tool_call['name']
-                        print(f"→ calling {tool_name}")
+                        tool_name = tool_call['name']
+                        if is_subagent:
+                            # Indent subagent tool calls to show hierarchy
+                            print(f"  ↳ [{subagent_name}] calling {tool_name}")
+                        else:
+                            if tool_name == 'task':
+                                print(f"→ calling specialized sub-agent")
+                            else:
+                                print(f"→ calling {tool_name}")
 
-                # Capture final answer (last AIMessage that doesn't have tool calls)
-                elif "AIMessage" in event_type and "tool_calls" not in event:
+                # Capture final answer (last AIMessage from main agent without tool calls)
+                elif "AIMessage" in event_type and "tool_calls" not in event and not is_subagent:
                     final_answer = content
 
             # Display final answer

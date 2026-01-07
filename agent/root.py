@@ -39,7 +39,7 @@ class DataAgent:
     def __init__(
         self,
         dataset_path: str = None,
-        model: str = "gpt-4",
+        model: str = "gpt-4.1",
         temperature: float = 0.1,
         enable_langfuse: bool = True,
     ):
@@ -151,13 +151,23 @@ class DataAgent:
         # Create input message
         input_message = {"messages": [HumanMessage(content=question)]}
 
-        # Stream events from the agent
+        # Stream events from the agent with subgraph support
+        # Format: (namespace_tuple, state_dict)
+        # - Parent: ((), {'messages': [...]})
+        # - Subgraph: (('subgraph_node:uuid',), {'messages': [...]})
         async for event in self.agent.astream(
-            input_message, config, stream_mode="values"
+            input_message, config, stream_mode="values", subgraphs=True
         ):
-            # Extract the last message from the event
-            if "messages" in event and len(event["messages"]) > 0:
-                last_message = event["messages"][-1]
+            # Parse the tuple: (namespace, state)
+            namespace, state = event
+
+            # Determine if this is from a subgraph
+            is_subagent = len(namespace) > 0
+            subagent_name = namespace[0].split(':')[0] if is_subagent and namespace else None
+
+            # Extract the last message from the state
+            if "messages" in state and len(state["messages"]) > 0:
+                last_message = state["messages"][-1]
 
                 event_data = {
                     "type": last_message.__class__.__name__,
@@ -166,7 +176,9 @@ class DataAgent:
                     else str(last_message),
                     "metadata": {
                         "thread_id": thread_id,
-                        "message_count": len(event["messages"]),
+                        "message_count": len(state["messages"]),
+                        "is_subagent": is_subagent,
+                        "subagent_name": subagent_name,
                     },
                 }
 

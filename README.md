@@ -199,13 +199,6 @@ Install Deno using the official installer:
 curl -fsSL https://deno.land/install.sh | sh
 ```
 
-After installation, add Deno to your PATH (the installer will provide specific instructions for your shell).
-
-Verify installation:
-```bash
-deno --version
-```
-
 ### Step 2: Clone Repository
 
 ```bash

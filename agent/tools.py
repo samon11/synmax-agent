@@ -69,7 +69,7 @@ class PyodideDatasetTool(BaseTool):
 
         try:
             # 1. Read the file locally (no LLM involvement)
-            df = pd.read_csv(Path(self.dataset_path))
+            df = pd.read_parquet(Path(self.dataset_path))
 
             # 2. Bootstrap code that creates the 'data' variable in the session
             bootstrap_code = """
@@ -165,7 +165,7 @@ def get_dataset_schema_and_sample(file_path: str) -> str:
     """Load dataset and return schema information with top 5 sample rows.
 
     Args:
-        file_path: Path to the dataset file (CSV format)
+        file_path: Path to the dataset file (Parquet format)
 
     Returns:
         Formatted string containing:
@@ -176,7 +176,7 @@ def get_dataset_schema_and_sample(file_path: str) -> str:
     """
     try:
         # Load the dataset
-        df = pd.read_csv(file_path)
+        df = pd.read_parquet(file_path)
 
         # Build schema information
         schema_parts = []
@@ -200,7 +200,5 @@ def get_dataset_schema_and_sample(file_path: str) -> str:
         return f"Error: Dataset file not found at path: {file_path}"
     except pd.errors.EmptyDataError:
         return f"Error: Dataset file is empty: {file_path}"
-    except pd.errors.ParserError as e:
-        return f"Error: Failed to parse CSV file: {str(e)}"
     except Exception as e:
-        return f"Error loading dataset schema: {str(e)}"
+        return f"Error: Failed to parse Parquet file: {str(e)}"
