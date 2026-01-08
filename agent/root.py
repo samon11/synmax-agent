@@ -7,7 +7,7 @@ from langchain_core.messages import HumanMessage
 from agent.react_agent import create_react_agent
 from agent.tools import execute_python_subprocess, get_dataset_schema_and_sample
 from agent.prompts import (
-    DATA_SCIENCE_AGENT_SYSTEM_PROMPT,
+    ROOT_AGENT_SYSTEM_PROMPT,
     STATISTICS_SUBAGENT_SYSTEM_PROMPT,
 )
 
@@ -92,15 +92,13 @@ class DataAgent:
         self.memory = InMemorySaver()
 
         # Format system prompt with dataset context and path
-        system_prompt = DATA_SCIENCE_AGENT_SYSTEM_PROMPT.format(
-            dataset_context=self.dataset_context,
-            dataset_path=self.dataset_path
+        system_prompt = ROOT_AGENT_SYSTEM_PROMPT.format(
+            dataset_context=self.dataset_context, dataset_path=self.dataset_path
         )
 
         # Format statistics subagent prompt with dataset context and path
         stats_system_prompt = STATISTICS_SUBAGENT_SYSTEM_PROMPT.format(
-            dataset_context=self.dataset_context,
-            dataset_path=self.dataset_path
+            dataset_context=self.dataset_context, dataset_path=self.dataset_path
         )
 
         # Create statistics subagent configuration
@@ -159,7 +157,9 @@ class DataAgent:
 
             # Determine if this is from a subgraph
             is_subagent = len(namespace) > 0
-            subagent_name = namespace[0].split(':')[0] if is_subagent and namespace else None
+            subagent_name = (
+                namespace[0].split(":")[0] if is_subagent and namespace else None
+            )
 
             # Extract the last message from the state
             if "messages" in state and len(state["messages"]) > 0:
@@ -181,7 +181,7 @@ class DataAgent:
                 # Add tool call information if present
                 if hasattr(last_message, "tool_calls") and last_message.tool_calls:
                     event_data["tool_calls"] = [
-                        {"name": tc.get("name", "unknown"), "id": tc.get("id", "")}
+                        {"name": tc.get("name", "unknown"), "id": tc.get("id", ""), "args": tc.get("args", {})}
                         for tc in last_message.tool_calls
                     ]
 

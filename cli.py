@@ -5,11 +5,33 @@ Command-line interface for the data analysis agent.
 import argparse
 import os
 import asyncio
+import json
 from dotenv import load_dotenv
 from agent.root import DataAgent
 
 MODEL = "gpt-4.1"
 
+def display_todos(todos_list):
+    """Display todos in a neat, readable format."""
+    status_icons = {
+        'pending': '⏸️ ',
+        'in_progress': '⏳',
+        'completed': '✅'
+    }
+
+    print("\n" + "=" * 60)
+    print("📋 PLAN:")
+    print("=" * 60)
+
+    for i, todo in enumerate(todos_list, 1):
+        status = todo.get('status', 'pending')
+        content = todo.get('content', '')
+        icon = status_icons.get(status, '  ')
+
+        # Format the line with proper indentation
+        print(f"  {i}. {icon} {content}")
+
+    print("=" * 60 + "\n")
 
 async def run_single_query(agent: DataAgent, query: str):
     """Run a single query and display the result."""
@@ -27,6 +49,21 @@ async def run_single_query(agent: DataAgent, query: str):
         if "tool_calls" in event:
             for tool_call in event["tool_calls"]:
                 tool_name = tool_call['name']
+
+                # Special handling for write_todos - display the plan
+                if tool_name == 'write_todos':
+                    tool_args = tool_call.get('args', {})
+                    if isinstance(tool_args, str):
+                        try:
+                            tool_args = json.loads(tool_args)
+                        except:
+                            pass
+
+                    todos_list = tool_args.get('todos', [])
+                    if todos_list:
+                        display_todos(todos_list)
+                    continue
+
                 if is_subagent:
                     # Indent subagent tool calls to show hierarchy
                     print(f"  ↳ [{subagent_name}] calling {tool_name}")
@@ -85,6 +122,21 @@ async def run_interactive(agent: DataAgent):
                 if "tool_calls" in event:
                     for tool_call in event["tool_calls"]:
                         tool_name = tool_call['name']
+
+                        # Special handling for write_todos - display the plan
+                        if tool_name == 'write_todos':
+                            tool_args = tool_call.get('args', {})
+                            if isinstance(tool_args, str):
+                                try:
+                                    tool_args = json.loads(tool_args)
+                                except:
+                                    pass
+
+                            todos_list = tool_args.get('todos', [])
+                            if todos_list:
+                                display_todos(todos_list)
+                            continue
+
                         if is_subagent:
                             # Indent subagent tool calls to show hierarchy
                             print(f"  ↳ [{subagent_name}] calling {tool_name}")
@@ -117,7 +169,7 @@ async def main_async(args):
     """Async main function."""
     # Initialize agent
     print("Initializing SynMax Data Agent...")
-    agent = DataAgent(dataset_path=args.dataset_path, model=MODEL, temperature=0.1)
+    agent = DataAgent(dataset_path=args.dataset_path, model=MODEL, temperature=0.0)
     print(f"Dataset path: {args.dataset_path}")
     print()
 
