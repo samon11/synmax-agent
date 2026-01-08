@@ -72,10 +72,16 @@ python cli.py
 
 You'll see:
 ```
-Data Agent initialized successfully.
-Dataset: data/dataset.parquet (1338 rows, 7 columns)
+Initializing SynMax Data Agent...
+Dataset path: ./data/pipeline_data.parquet
 
-Ask a question (or type 'quit' to exit):
+============================================================
+SynMax Data Agent - Interactive Mode
+============================================================
+Ask questions about your data in natural language.
+Type 'exit' or 'quit' to end the session.
+============================================================
+
 >
 ```
 
