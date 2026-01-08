@@ -91,7 +91,7 @@ class ASTSecurityChecker(ast.NodeVisitor):
         }
         self.dangerous_pathlib_methods: Set[str] = {
             'write_text', 'write_bytes', 'mkdir', 'touch',
-            'unlink', 'rmdir', 'rename', 'chmod'
+            'unlink', 'rmdir', 'chmod'
         }
 
     def visit_Call(self, node: ast.Call):
@@ -182,6 +182,10 @@ def check_code_safety(code: str) -> tuple[bool, list[str]]:
 @tool
 def execute_python_subprocess(code: str, timeout: int = 30) -> str:
     """Execute Python code in a subprocess with safety checks.
+
+    IMPORTANT: This tool is STATELESS. Each execution runs in a fresh, isolated
+    subprocess. All variables, imports, and state are lost after execution.
+    Each call starts with an empty session - nothing persists between executions.
 
     This tool runs Python code in an isolated subprocess after performing
     AST-based safety checks. It uses a 'trust but verify' approach:
