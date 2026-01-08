@@ -163,9 +163,11 @@ def create_react_agent(
 
     return create_agent(
         model,
-        system_prompt=system_prompt + "\n\n" + BASE_AGENT_PROMPT
-        if system_prompt
-        else BASE_AGENT_PROMPT,
+        system_prompt=(
+            system_prompt + "\n\n" + BASE_AGENT_PROMPT
+            if system_prompt
+            else BASE_AGENT_PROMPT
+        ),
         tools=tools,
         middleware=plainagent_middleware,
         response_format=response_format,

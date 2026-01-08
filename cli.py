@@ -11,27 +11,25 @@ from agent.root import DataAgent
 
 MODEL = "gpt-4.1"
 
+
 def display_todos(todos_list):
     """Display todos in a neat, readable format."""
-    status_icons = {
-        'pending': '⏸️ ',
-        'in_progress': '⏳',
-        'completed': '✅'
-    }
+    status_icons = {"pending": "⏸️ ", "in_progress": "⏳", "completed": "✅"}
 
     print("\n" + "=" * 60)
     print("📋 PLAN:")
     print("=" * 60)
 
     for i, todo in enumerate(todos_list, 1):
-        status = todo.get('status', 'pending')
-        content = todo.get('content', '')
-        icon = status_icons.get(status, '  ')
+        status = todo.get("status", "pending")
+        content = todo.get("content", "")
+        icon = status_icons.get(status, "  ")
 
         # Format the line with proper indentation
         print(f"  {i}. {icon} {content}")
 
     print("=" * 60 + "\n")
+
 
 async def run_single_query(agent: DataAgent, query: str):
     """Run a single query and display the result."""
@@ -48,18 +46,18 @@ async def run_single_query(agent: DataAgent, query: str):
         # Show tool calls when AI decides to call a tool
         if "tool_calls" in event:
             for tool_call in event["tool_calls"]:
-                tool_name = tool_call['name']
+                tool_name = tool_call["name"]
 
                 # Special handling for write_todos - display the plan
-                if tool_name == 'write_todos':
-                    tool_args = tool_call.get('args', {})
+                if tool_name == "write_todos":
+                    tool_args = tool_call.get("args", {})
                     if isinstance(tool_args, str):
                         try:
                             tool_args = json.loads(tool_args)
                         except:
                             pass
 
-                    todos_list = tool_args.get('todos', [])
+                    todos_list = tool_args.get("todos", [])
                     if todos_list:
                         display_todos(todos_list)
                     continue
@@ -68,13 +66,15 @@ async def run_single_query(agent: DataAgent, query: str):
                     # Indent subagent tool calls to show hierarchy
                     print(f"  ↳ [{subagent_name}] calling {tool_name}")
                 else:
-                    if tool_name == 'task':
+                    if tool_name == "task":
                         print("→ calling stats sub-agent")
                     else:
                         print(f"→ calling {tool_name}")
 
         # Capture final answer (last AIMessage from main agent without tool calls)
-        elif "AIMessage" in event_type and "tool_calls" not in event and not is_subagent:
+        elif (
+            "AIMessage" in event_type and "tool_calls" not in event and not is_subagent
+        ):
             final_answer = content
 
     # Display final answer
@@ -99,7 +99,7 @@ async def run_interactive(agent: DataAgent):
             question = await loop.run_in_executor(None, lambda: input("\n> ").strip())
 
             # Check for exit commands
-            if question.lower() in ['exit', 'quit', 'q']:
+            if question.lower() in ["exit", "quit", "q"]:
                 print("\nGoodbye!")
                 break
 
@@ -121,18 +121,18 @@ async def run_interactive(agent: DataAgent):
                 # Show tool calls when AI decides to call a tool
                 if "tool_calls" in event:
                     for tool_call in event["tool_calls"]:
-                        tool_name = tool_call['name']
+                        tool_name = tool_call["name"]
 
                         # Special handling for write_todos - display the plan
-                        if tool_name == 'write_todos':
-                            tool_args = tool_call.get('args', {})
+                        if tool_name == "write_todos":
+                            tool_args = tool_call.get("args", {})
                             if isinstance(tool_args, str):
                                 try:
                                     tool_args = json.loads(tool_args)
                                 except:
                                     pass
 
-                            todos_list = tool_args.get('todos', [])
+                            todos_list = tool_args.get("todos", [])
                             if todos_list:
                                 display_todos(todos_list)
                             continue
@@ -141,13 +141,17 @@ async def run_interactive(agent: DataAgent):
                             # Indent subagent tool calls to show hierarchy
                             print(f"  ↳ [{subagent_name}] calling {tool_name}")
                         else:
-                            if tool_name == 'task':
+                            if tool_name == "task":
                                 print("→ calling stats sub-agent")
                             else:
                                 print(f"→ calling {tool_name}")
 
                 # Capture final answer (last AIMessage from main agent without tool calls)
-                elif "AIMessage" in event_type and "tool_calls" not in event and not is_subagent:
+                elif (
+                    "AIMessage" in event_type
+                    and "tool_calls" not in event
+                    and not is_subagent
+                ):
                     final_answer = content
 
             # Display final answer
@@ -194,12 +198,10 @@ def main():
         "--dataset-path",
         type=str,
         default=os.getenv("DATASET_PATH", "./data/dataset.csv"),
-        help="Path to the dataset file"
+        help="Path to the dataset file",
     )
     parser.add_argument(
-        "--query",
-        type=str,
-        help="Single query to run (non-interactive mode)"
+        "--query", type=str, help="Single query to run (non-interactive mode)"
     )
 
     args = parser.parse_args()
@@ -214,7 +216,9 @@ def main():
     # Check if dataset exists
     if not os.path.exists(args.dataset_path):
         print(f"Warning: Dataset not found at {args.dataset_path}")
-        print("Please ensure the dataset is available or specify a different path with --dataset-path")
+        print(
+            "Please ensure the dataset is available or specify a different path with --dataset-path"
+        )
         print()
 
     # Run async main

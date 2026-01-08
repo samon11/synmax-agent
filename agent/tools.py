@@ -10,6 +10,7 @@ from pathlib import Path
 from langchain_core.tools import tool
 from typing import Set
 
+
 def get_dataset_schema_and_sample(file_path: str) -> str:
     """Load dataset and return schema information with top 5 sample rows.
 
@@ -26,9 +27,9 @@ def get_dataset_schema_and_sample(file_path: str) -> str:
     try:
         # Load the dataset
         path = Path(file_path)
-        if path.suffix.lower() == '.csv':
+        if path.suffix.lower() == ".csv":
             df = pd.read_csv(file_path)
-        elif path.suffix.lower() == '.parquet':
+        elif path.suffix.lower() == ".parquet":
             df = pd.read_parquet(file_path)
         else:
             return f"Error: Unsupported file format: {path.suffix}. Only .csv and .parquet are supported."
@@ -79,19 +80,46 @@ class ASTSecurityChecker(ast.NodeVisitor):
     def __init__(self):
         self.issues: list[str] = []
         self.dangerous_functions: Set[str] = {
-            'exec', 'eval', 'compile', '__import__', 'input'
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "input",
         }
         self.dangerous_modules: Set[str] = {
-            'os', 'subprocess', 'sys', 'socket', 'urllib',
-            'requests', 'http', 'shutil'
+            "os",
+            "subprocess",
+            "sys",
+            "socket",
+            "urllib",
+            "requests",
+            "http",
+            "shutil",
         }
         self.write_modes: Set[str] = {
-            'w', 'a', 'w+', 'a+', 'r+', 'x', 'x+',
-            'wb', 'ab', 'wb+', 'ab+', 'rb+', 'xb', 'xb+'
+            "w",
+            "a",
+            "w+",
+            "a+",
+            "r+",
+            "x",
+            "x+",
+            "wb",
+            "ab",
+            "wb+",
+            "ab+",
+            "rb+",
+            "xb",
+            "xb+",
         }
         self.dangerous_pathlib_methods: Set[str] = {
-            'write_text', 'write_bytes', 'mkdir', 'touch',
-            'unlink', 'rmdir', 'chmod'
+            "write_text",
+            "write_bytes",
+            "mkdir",
+            "touch",
+            "unlink",
+            "rmdir",
+            "chmod",
         }
 
     def visit_Call(self, node: ast.Call):
@@ -108,12 +136,14 @@ class ASTSecurityChecker(ast.NodeVisitor):
             self.issues.append(f"Potentially dangerous function call: {func_name}()")
 
         # Special handling for open() - only block write modes
-        elif func_name == 'open':
+        elif func_name == "open":
             self._check_open_call(node)
 
         # Check for dangerous pathlib methods
         elif func_name in self.dangerous_pathlib_methods:
-            self.issues.append(f"Potentially dangerous pathlib operation: .{func_name}()")
+            self.issues.append(
+                f"Potentially dangerous pathlib operation: .{func_name}()"
+            )
 
         self.generic_visit(node)
 
@@ -128,7 +158,7 @@ class ASTSecurityChecker(ast.NodeVisitor):
 
         # Check keyword args
         for keyword in node.keywords:
-            if keyword.arg == 'mode':
+            if keyword.arg == "mode":
                 mode_arg = keyword.value
                 break
 
@@ -136,10 +166,14 @@ class ASTSecurityChecker(ast.NodeVisitor):
         if isinstance(mode_arg, ast.Constant) and isinstance(mode_arg.value, str):
             mode = mode_arg.value
             if any(write_mode in mode for write_mode in self.write_modes):
-                self.issues.append(f"File write operation detected: open(..., mode='{mode}')")
+                self.issues.append(
+                    f"File write operation detected: open(..., mode='{mode}')"
+                )
         elif mode_arg is not None:
             # Mode is specified but not a constant (could be a variable)
-            self.issues.append("File open with non-constant mode (cannot verify safety)")
+            self.issues.append(
+                "File open with non-constant mode (cannot verify safety)"
+            )
 
     def visit_Import(self, node: ast.Import):
         """Check for dangerous module imports."""
@@ -217,19 +251,23 @@ def execute_python_subprocess(code: str, timeout: int = 30) -> str:
     is_safe, issues = check_code_safety(code)
 
     if not is_safe and issues:
-        warning_msg = "SECURITY WARNING - Code contains potentially dangerous operations:\n"
+        warning_msg = (
+            "SECURITY WARNING - Code contains potentially dangerous operations:\n"
+        )
         for issue in issues:
             warning_msg += f"  - {issue}\n"
-        warning_msg += "\nExecution blocked. Please review the code for safety concerns."
+        warning_msg += (
+            "\nExecution blocked. Please review the code for safety concerns."
+        )
         return warning_msg
 
     # Step 2: Execute in subprocess using the same Python interpreter
     try:
         result = subprocess.run(
-            [sys.executable, '-c', code],
+            [sys.executable, "-c", code],
             capture_output=True,
             text=True,
-            timeout=timeout
+            timeout=timeout,
         )
 
         # Combine stdout and stderr
@@ -241,7 +279,11 @@ def execute_python_subprocess(code: str, timeout: int = 30) -> str:
         if result.returncode != 0:
             output_parts.append(f"\nExit code: {result.returncode}")
 
-        output = "\n".join(output_parts) if output_parts else "Code executed successfully (no output)"
+        output = (
+            "\n".join(output_parts)
+            if output_parts
+            else "Code executed successfully (no output)"
+        )
         return output
 
     except subprocess.TimeoutExpired:

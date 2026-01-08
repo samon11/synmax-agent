@@ -167,9 +167,11 @@ class DataAgent:
 
                 event_data = {
                     "type": last_message.__class__.__name__,
-                    "content": last_message.content
-                    if hasattr(last_message, "content")
-                    else str(last_message),
+                    "content": (
+                        last_message.content
+                        if hasattr(last_message, "content")
+                        else str(last_message)
+                    ),
                     "metadata": {
                         "thread_id": thread_id,
                         "message_count": len(state["messages"]),
@@ -181,7 +183,11 @@ class DataAgent:
                 # Add tool call information if present
                 if hasattr(last_message, "tool_calls") and last_message.tool_calls:
                     event_data["tool_calls"] = [
-                        {"name": tc.get("name", "unknown"), "id": tc.get("id", ""), "args": tc.get("args", {})}
+                        {
+                            "name": tc.get("name", "unknown"),
+                            "id": tc.get("id", ""),
+                            "args": tc.get("args", {}),
+                        }
                         for tc in last_message.tool_calls
                     ]
 
