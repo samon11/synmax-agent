@@ -4,7 +4,7 @@ Create a chat-based agent in Python that can interact with the linked dataset an
 Pattern recognition (e.g., clustering, correlations, trends)
 Anomaly detection (e.g., outliers, rule violations)
 Proposing plausible causes behind observed relationships (with caveats and evidence)
-Dataset: https://drive.google.com/file/d/109vhmnSLN3oofjFdyb58l_rUZRa0d6C8/view?usp=drivesdk  Due: one week from receipt
+Due: one week from receipt
 Do not include the dataset file in your repo.
 What to Build
 Capabilities
