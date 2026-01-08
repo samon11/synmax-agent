@@ -1,6 +1,6 @@
 # SynMax Data Agent
 
-A chat-based AI agent for analyzing any CSV dataset. Built with a hierarchical agent architecture that combines intelligent query routing with rigorous statistical analysis.
+A chat-based AI agent for analyzing ANY Parquet or CSV dataset. Built with a hierarchical agent architecture that combines intelligent query routing with rigorous statistical analysis.
 
 ## Table of Contents
 
@@ -21,11 +21,11 @@ A chat-based AI agent for analyzing any CSV dataset. Built with a hierarchical a
 ### Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/synmax-agent.git
+git clone https://github.com/samon11/synmax-agent
 cd synmax-agent
 ```
 
-### Step 2: Install Python Dependencies
+### Step 2: Install Python Dependencies (virtual env recommended)
 
 ```bash
 pip install -r requirements.txt
@@ -84,6 +84,23 @@ Exit with `quit` or `exit`.
 
 ## Example Queries & Outputs
 
+### State Volume Analysis
+
+**Query:**
+```
+Which state had the highest total volume for 2024?
+```
+
+**Answer:**
+Louisiana (LA) had the highest total scheduled gas volume in 2024, with approximately 25.1 billion units.
+
+**Supporting Evidence:**
+- **Methods**: Filtered 2024 records, grouped by state_abb, and summed scheduled_quantity to find the top state.
+- **Columns**: state_abb, scheduled_quantity, eff_gas_day
+- **Key Findings**: LA total scheduled_quantity ≈ 25,119,300,000; 48 states had non-null data for 2024.
+- **Limitations**: Some records lacked state_abb (nulls), but these were excluded from the ranking.
+- **Notable Insights**: Louisiana's volume far exceeded other states, indicating its central role in 2024 pipeline activity.
+
 ### Pipeline Network Bottleneck Analysis
 
 **Query:**
@@ -137,22 +154,6 @@ In 2023, total scheduled gas volume decreased by about 21% compared to 2022 (fro
   - Top counties shifted: Daggett (2022) to Cameron Parish/Greene (2023)
 - **Limitations**: County and state-level results may be affected by missing location data; only top 10 counties shown for each year.
 
-### State Volume Analysis
-
-**Query:**
-```
-Which state had the highest total volume for 2024?
-```
-
-**Answer:**
-Louisiana (LA) had the highest total scheduled gas volume in 2024, with approximately 25.1 billion units.
-
-**Supporting Evidence:**
-- **Methods**: Filtered 2024 records, grouped by state_abb, and summed scheduled_quantity to find the top state.
-- **Columns**: state_abb, scheduled_quantity, eff_gas_day
-- **Key Findings**: LA total scheduled_quantity ≈ 25,119,300,000; 48 states had non-null data for 2024.
-- **Limitations**: Some records lacked state_abb (nulls), but these were excluded from the ranking.
-- **Notable Insights**: Louisiana's volume far exceeded other states, indicating its central role in 2024 pipeline activity.
 
 ## Features
 
@@ -194,11 +195,6 @@ flowchart TD
     M --> N
     N --> O[Structured Response<br/>+ Supporting Evidence]
     O --> P[Stream to User]
-
-    style C fill:#e1f5ff
-    style H fill:#ffe1f5
-    style E fill:#f0f0f0
-    style O fill:#e8f5e9
 ```
 
 ### Key Components
@@ -285,13 +281,6 @@ graph LR
     G --> H[Agent Core]
 
     H --> I[LLM Response]
-
-    style B fill:#e3f2fd
-    style C fill:#f3e5f5
-    style D fill:#fff3e0
-    style E fill:#e8f5e9
-    style F fill:#fce4ec
-    style G fill:#fff9c4
 ```
 
 **Middleware Responsibilities**:
