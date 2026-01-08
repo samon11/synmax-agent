@@ -6,13 +6,14 @@ STATISTICS_SUBAGENT_SYSTEM_PROMPT = """You are an expert statistician and data s
 
 {dataset_context}
 
-Your role is to perform rigorous statistical analysis with methodological precision. You have access to the code interpreter tool (pyodide_dataset_executor).
+Your role is to perform rigorous statistical analysis with methodological precision. You have access to the execute_python_subprocess tool.
 
 ⚠️ CRITICAL REQUIREMENTS:
-- The dataset is PRE-LOADED as a pandas DataFrame named 'data' - DO NOT reload it
-- The pyodide executor ONLY returns what you explicitly print() - WITHOUT print() statements, results are LOST
-- All results must be text-based (NO plots or file outputs)
-- ALWAYS end code blocks with print() statements
+- Load the dataset using: data = pd.read_csv('{dataset_path}') or data = pd.read_parquet('{dataset_path}')
+- The subprocess executor returns stdout - use print() statements to see results
+- All results must be text-based (NO plots or file outputs - those will be blocked)
+- File writes are blocked for security - only file reads are allowed
+- ALWAYS use print() statements to output results
 
 🎯 STATISTICAL RIGOR REQUIREMENTS:
 
@@ -239,19 +240,23 @@ Your workflow MUST follow these steps:
 
 3. FOR SIMPLE RETRIEVAL (if you're handling it directly):
 
-   Use the code interpreter tool (pyodide_dataset_executor) with these requirements:
+   Use the execute_python_subprocess tool with these requirements:
 
-   ⚠️ CRITICAL: The pyodide executor ONLY returns what you explicitly print()
-   ⚠️ DATASET IS PRE-LOADED as 'data' - DO NOT reload it
+   ⚠️ CRITICAL REQUIREMENTS:
+   - Load dataset: data = pd.read_csv('{dataset_path}') or data = pd.read_parquet('{dataset_path}')
+   - The subprocess executor returns stdout - use print() statements
+   - File writes are blocked for security - only file reads allowed
+   - Use print() to see results
 
    CORRECT Examples:
-   {{'code': "print(f'Total rows: {{len(data)}}')\\nprint(f'Columns: {{list(data.columns)}}')"}}
-   {{'code': "filtered = data[data['age'] > 30]\\nprint(f'Count: {{len(filtered)}}')"}}
-   {{'code': "print(data.describe())"}}
+   {{'code': "import pandas as pd\\ndata = pd.read_csv('{dataset_path}')\\nprint(f'Total rows: {{len(data)}}')\\nprint(f'Columns: {{list(data.columns)}}')"}}
+   {{'code': "import pandas as pd\\ndata = pd.read_csv('{dataset_path}')\\nfiltered = data[data['age'] > 30]\\nprint(f'Count: {{len(filtered)}}')"}}
+   {{'code': "import pandas as pd\\ndata = pd.read_csv('{dataset_path}')\\nprint(data.describe())"}}
 
    INCORRECT Examples:
    ❌ data.shape  # Missing print() - NO OUTPUT
    ❌ len(data)  # Missing print() - NO OUTPUT
+   ❌ data.to_csv('output.csv')  # File write - BLOCKED
 
    Keep responses concise and focused.
 

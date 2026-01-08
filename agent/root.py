@@ -5,7 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 
 from agent.react_agent import create_react_agent
-from agent.tools import PyodideDatasetTool, get_dataset_schema_and_sample
+from agent.tools import execute_python_subprocess, get_dataset_schema_and_sample
 from agent.prompts import (
     DATA_SCIENCE_AGENT_SYSTEM_PROMPT,
     STATISTICS_SUBAGENT_SYSTEM_PROMPT,
@@ -28,6 +28,7 @@ class DataAgent:
     Architecture:
     - Main coordinator agent: Routes queries and handles simple retrieval
     - Statistics subagent: Handles advanced statistical analysis with proper methodology
+    - Python subprocess execution: Secure code execution with safety checks (blocks writes, allows reads)
 
     The coordinator delegates complex tasks (correlations, patterns, forecasting, etc.)
     to the specialized statistics subagent which has rigorous training in:
@@ -84,24 +85,22 @@ class DataAgent:
             model=model, temperature=temperature, api_key=self.api_key
         )
 
-        # Create code interpreter tool with dataset access
-        # Bootstrap happens lazily on first use
-        self.code_interpreter = PyodideDatasetTool(dataset_path=self.dataset_path)
-
         # Load dataset schema and sample rows
         self.dataset_context = get_dataset_schema_and_sample(self.dataset_path)
 
         # Create memory saver for conversation history
         self.memory = InMemorySaver()
 
-        # Format system prompt with dataset context
+        # Format system prompt with dataset context and path
         system_prompt = DATA_SCIENCE_AGENT_SYSTEM_PROMPT.format(
-            dataset_context=self.dataset_context
+            dataset_context=self.dataset_context,
+            dataset_path=self.dataset_path
         )
 
-        # Format statistics subagent prompt with dataset context
+        # Format statistics subagent prompt with dataset context and path
         stats_system_prompt = STATISTICS_SUBAGENT_SYSTEM_PROMPT.format(
-            dataset_context=self.dataset_context
+            dataset_context=self.dataset_context,
+            dataset_path=self.dataset_path
         )
 
         # Create statistics subagent configuration
@@ -109,13 +108,13 @@ class DataAgent:
             "name": "stats-agent",
             "description": "Expert statistician for advanced analysis including correlations, patterns, anomalies, forecasting, and statistical tests. Handles all categorical variable encoding properly.",
             "system_prompt": stats_system_prompt,
-            "tools": [self.code_interpreter],
+            "tools": [execute_python_subprocess],
         }
 
         # Create the deep agent with system prompt, tools, and subagents
         self.agent = create_react_agent(
             model=self.llm,
-            tools=[self.code_interpreter],
+            tools=[execute_python_subprocess],
             system_prompt=system_prompt,
             checkpointer=self.memory,
             subagents=[statistics_subagent],
@@ -140,9 +139,6 @@ class DataAgent:
             >>> async for event in agent.astream("How many records are there?"):
             >>>     print(f"{event['type']}: {event['content']}")
         """
-        # Bootstrap dataset on first use (idempotent)
-        await self.code_interpreter.bootstrap()
-
         # Build config with thread_id and optional Langfuse callback
         config = {"configurable": {"thread_id": thread_id}}
         if self.langfuse_handler:
@@ -215,9 +211,6 @@ class DataAgent:
             >>> result = await agent.aquery("What's the average revenue by category?")
             >>> print(result["answer"])
         """
-        # Bootstrap dataset on first use (idempotent)
-        await self.code_interpreter.bootstrap()
-
         # Build config with thread_id and optional Langfuse callback
         config = {"configurable": {"thread_id": thread_id}}
         if self.langfuse_handler:

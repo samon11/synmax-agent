@@ -117,7 +117,7 @@ async def main_async(args):
     """Async main function."""
     # Initialize agent
     print("Initializing SynMax Data Agent...")
-    agent = DataAgent(dataset_path=args.dataset_path, model=MODEL)
+    agent = DataAgent(dataset_path=args.dataset_path, model=MODEL, temperature=0.1)
     print(f"Dataset path: {args.dataset_path}")
     print()
 
