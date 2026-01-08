@@ -277,7 +277,7 @@ The statistics subagent enforces best practices for categorical variables:
 
 ### Dependencies
 
-Key libraries (143 total packages):
+Key libraries:
 
 ```
 langgraph==1.0.5           # Agent orchestration
